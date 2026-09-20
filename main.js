@@ -30,6 +30,7 @@ const state = {
   dir: 1,
   ready: false,
   decoding: new Set(),
+  lastTick: 0, // when the rAF loop last ran; used to detect a stalled loop
 };
 
 /* -- decoding -----------------------------------------------
@@ -83,6 +84,9 @@ async function decode(i) {
   state.decoding.add(i);
   try {
     state.frames.set(i, await decodeBlob(state.blobs[i]));
+    // With the render loop stalled nothing else will paint this, and the canvas
+    // would sit on whatever neighbour frame was nearest when the scroll landed.
+    if (loopStalled() && Math.round(state.smooth) === i) drawFrame(i);
   } catch {
     /* transient - retried on a later tick */
   }
@@ -190,9 +194,11 @@ function drawFrame(i) {
     yBias = 0.5;
   }
 
-  const w = src.width * s;
-  const h = src.height * s;
-  ctx.drawImage(src, (cw - w) / 2, (ch - h) * yBias, w, h);
+  // Round to whole device pixels: fractional destination coordinates make the
+  // browser resample the edges, which can leave a faint seam against the fill.
+  const w = Math.ceil(src.width * s);
+  const h = Math.ceil(src.height * s);
+  ctx.drawImage(src, Math.round((cw - w) / 2), Math.round((ch - h) * yBias), w, h);
   state.current = j;
 }
 
@@ -236,10 +242,14 @@ function updateCaptions(p) {
 
 /* -- main loop ---------------------------------------------- */
 
+/** True when the rAF loop hasn't run recently (throttled or suspended). */
+const loopStalled = () => performance.now() - state.lastTick > 200;
+
 let lastT = performance.now();
 function tick(now) {
   const dt = Math.min((now - lastT) / 1000, 0.5) || 0.016;
   lastT = now;
+  state.lastTick = performance.now();
   if (state.ready) {
     const p = progress();
     const prevTarget = state.target;
@@ -285,11 +295,22 @@ function devPlaceholder(msg) {
 window.addEventListener("resize", resize);
 resize();
 
-// rAF gets throttled in backgrounded and low-power tabs, which can leave the
-// captions a step behind the scroll. They are a pure function of progress, so
-// keep them honest from the scroll event too (the frame draw stays in the tick).
+// rAF is throttled in backgrounded tabs and iOS Low Power Mode, and stops
+// entirely in some webviews. The captions are a pure function of progress, so
+// always update them from the scroll event. The frame normally draws in the
+// tick — but if that loop has stalled, draw from here too. Otherwise the canvas
+// holds a stale frame while the captions move on, and a partial repaint shows
+// two different frames at once (a "doubled" image, usually at the edges).
 addEventListener("scroll", () => {
-  if (state.ready) updateCaptions(progress());
+  if (!state.ready) return;
+  const p = progress();
+  updateCaptions(p);
+  if (loopStalled()) {
+    state.target = state.smooth = p * (state.count - 1);
+    const i = Math.round(state.smooth);
+    manageWindow(i);
+    if (i !== state.current) drawFrame(i);
+  }
 }, { passive: true });
 
 loadManifest()
