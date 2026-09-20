@@ -158,6 +158,9 @@ function nearestDecoded(i) {
   return -1;
 }
 
+/** Phones get a different fit — see drawFrame. */
+const isNarrow = () => window.matchMedia("(max-width: 760px)").matches;
+
 function drawFrame(i) {
   const j = nearestDecoded(i);
   if (j < 0) return;
@@ -166,11 +169,30 @@ function drawFrame(i) {
   const ch = canvas.height;
   ctx.fillStyle = BG;
   ctx.fillRect(0, 0, cw, ch);
-  // contain-fit with 4% overscan; the vignette hides the letterbox seam
-  const s = Math.min(cw / src.width, ch / src.height) * 1.04;
+
+  const contain = Math.min(cw / src.width, ch / src.height);
+  let s, yBias;
+  if (isNarrow()) {
+    // A 16:9 frame contain-fitted into a tall phone screen collapses to a thin
+    // band using about a quarter of the height. Zoom past contain and crop the
+    // sides instead — the product sits centrally in every beat — but never crop
+    // away so much that the pair loses its edges, so keep at least KEEP_W of the
+    // source width. Then sit the frame high, leaving the lower third to the
+    // captions rather than printing them over the product.
+    const KEEP_W = 0.55;
+    const cover = Math.max(cw / src.width, ch / src.height);
+    s = Math.max(Math.min(cover, cw / (src.width * KEEP_W)), contain);
+    // 0.28 rather than centred: clears the tallest caption block and trims the
+    // dead space above the frame
+    yBias = 0.28;
+  } else {
+    s = contain * 1.04; // slight overscan; the vignette hides the seam
+    yBias = 0.5;
+  }
+
   const w = src.width * s;
   const h = src.height * s;
-  ctx.drawImage(src, (cw - w) / 2, (ch - h) / 2, w, h);
+  ctx.drawImage(src, (cw - w) / 2, (ch - h) * yBias, w, h);
   state.current = j;
 }
 
@@ -182,6 +204,10 @@ function progress() {
 }
 
 function transformBase(el) {
+  // On phones every caption is a full-width block pinned to the lower area by
+  // CSS, so the centring translates must not be re-applied here — this runs as
+  // an inline style and would otherwise beat the stylesheet.
+  if (isNarrow()) return "";
   if (el.classList.contains("cap-center")) return "translate(-50%, -50%)";
   if (el.classList.contains("cap-top") || el.classList.contains("cap-bottom"))
     return "translateX(-50%)";
