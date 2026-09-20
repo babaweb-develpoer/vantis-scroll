@@ -1,8 +1,13 @@
 # VANTIS 01 — scroll film site
 
+**Live: <https://babaweb-develpoer.github.io/vantis-scroll/>**
+
 An Apple-style scroll-driven product site for a fictional racing shoe. Scroll
 position scrubs a frame sequence on a canvas (the AirPods technique), then the
 page continues into a full brand homepage below the film.
+
+VANTIS is an invented brand and the footage is AI-generated; nothing here is a
+real product.
 
 **It now runs on your real footage**: `assets/clips/float.mp4`, a 10-second
 clip of a bone-white pair in a white studio, sliced into **240 WebP frames**
@@ -33,11 +38,17 @@ whenever you like.
 ## Run it
 
 ```bash
-python -m http.server 4173 -d .
+git clone https://github.com/babaweb-develpoer/vantis-scroll.git
+```
+
+```bash
+python -m http.server 4173 -d vantis-scroll
 ```
 
 Then open <http://localhost:4173>. Any static server works; there is no build
-step and no dependencies.
+step and no dependencies. Rebuilding the film needs only **ffmpeg** (WebP is
+encoded by libwebp inside ffmpeg, so there is no Pillow dependency) and
+Python 3 for the scripts in `tools/`.
 
 ## The two prompt packs
 
