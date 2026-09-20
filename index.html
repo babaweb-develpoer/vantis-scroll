@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VANTIS 01 &mdash; Run Lighter</title>
+<meta name="description" content="VANTIS 01. One thread, one sole, one hundred and ninety grams. A racing shoe engineered to disappear underfoot.">
+<meta property="og:title" content="VANTIS 01">
+<meta property="og:description" content="One thread, one sole, one hundred and ninety grams. Run lighter.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="img/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#f3f1ee">
+<link rel="icon" href="img/favicon.png" type="image/png">
+<style>
+  :root {
+    --bg: #f3f1ee;
+    --bg-lift: #fbfaf8;
+    --ink: #17181b;
+    --accent: #17181b;
+    --text: #17181b;
+    --text-dim: rgba(23, 24, 27, 0.56);
+    --hairline: rgba(23, 24, 27, 0.14);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: auto; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "SF Pro Display", "Helvetica Neue", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  ::selection { background: var(--ink); color: var(--bg); }
+
+  /* -- loader -- */
+  #loader {
+    position: fixed; inset: 0; z-index: 100;
+    background: var(--bg);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 28px;
+    transition: opacity 0.8s ease;
+  }
+  #loader.done { opacity: 0; pointer-events: none; }
+  #loader .mark {
+    font-size: 15px; letter-spacing: 0.5em; text-indent: 0.5em;
+    color: var(--ink); text-transform: uppercase; font-weight: 500;
+  }
+  #loader .bar {
+    width: 180px; height: 1px; background: rgba(23, 24, 27, 0.16);
+    overflow: hidden; position: relative;
+  }
+  #loader .bar i {
+    position: absolute; inset: 0;
+    background: var(--ink); display: block;
+    transform: scaleX(0); transform-origin: left center;
+    transition: transform 0.2s ease;
+  }
+
+  /* -- scroll stage -- */
+  #track { height: 700vh; position: relative; }
+  #stage {
+    position: sticky; top: 0; height: 100vh; width: 100%;
+    overflow: hidden;
+  }
+  #film {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    display: block;
+  }
+  /* the film is near-white and the captions sit on its left and right, so wash
+     both flanks back toward the page colour — the product stays clear through
+     the middle, the type always has something to sit on */
+  #scrim {
+    position: absolute; inset: 0; z-index: 6; pointer-events: none;
+    background: linear-gradient(to right,
+      rgba(243, 241, 238, 0.86) 0%,
+      rgba(243, 241, 238, 0) 40%,
+      rgba(243, 241, 238, 0) 60%,
+      rgba(243, 241, 238, 0.86) 100%);
+  }
+  /* light-theme vignette: the frames are near-white, so the edges are feathered
+     back into the page colour rather than darkened */
+  #vignette {
+    position: absolute; inset: 0; z-index: 5; pointer-events: none;
+    background:
+      radial-gradient(ellipse 66% 74% at 50% 50%, transparent 56%, rgba(243, 241, 238, 0.96) 98%),
+      linear-gradient(to right, rgba(243, 241, 238, 0.96), transparent 16%, transparent 84%, rgba(243, 241, 238, 0.96));
+  }
+
+  /* -- captions -- */
+  .caption {
+    position: absolute; z-index: 10;
+    opacity: 0; pointer-events: none; visibility: hidden;
+    will-change: opacity, transform;
+  }
+  .caption h1 {
+    font-size: clamp(44px, 7.4vw, 104px);
+    font-weight: 650; letter-spacing: -0.038em; line-height: 0.98;
+  }
+  .caption h2 {
+    font-size: clamp(30px, 4.4vw, 64px);
+    font-weight: 650; letter-spacing: -0.032em; line-height: 1.03;
+  }
+  .caption p {
+    margin-top: 14px;
+    font-size: clamp(15px, 1.4vw, 19px);
+    color: rgba(23, 24, 27, 0.72); font-weight: 400;
+    line-height: 1.6; max-width: 34ch;
+  }
+  .caption .num {
+    display: block; margin-bottom: 14px;
+    font-size: 11px; letter-spacing: 0.4em; text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  .cap-center { left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center; }
+  .cap-center p { margin-left: auto; margin-right: auto; }
+  .cap-left { left: 7vw; top: 50%; transform: translateY(-50%); }
+  .cap-right { right: 7vw; top: 50%; transform: translateY(-50%); text-align: right; }
+  .cap-right p { margin-left: auto; }
+  .cap-top { left: 50%; top: 12vh; transform: translateX(-50%); text-align: center; }
+  .cap-bottom { left: 50%; bottom: 10vh; transform: translateX(-50%); text-align: center; }
+
+  #scroll-cue {
+    position: absolute; bottom: 4.5vh; left: 50%; transform: translateX(-50%);
+    z-index: 10; display: flex; flex-direction: column; align-items: center; gap: 10px;
+    color: var(--text-dim); font-size: 12px; letter-spacing: 0.3em; text-indent: 0.3em;
+    text-transform: uppercase;
+    transition: opacity 0.5s ease;
+  }
+  #scroll-cue::after {
+    content: ""; width: 1px; height: 34px;
+    background: linear-gradient(to bottom, var(--ink), transparent);
+    animation: cue 1.8s ease-in-out infinite;
+  }
+  @keyframes cue {
+    0%, 100% { transform: translateY(0); opacity: 1; }
+    50% { transform: translateY(8px); opacity: 0.4; }
+  }
+
+  /* -- buttons -- */
+  .cta {
+    margin-top: 30px; pointer-events: auto;
+    display: inline-block;
+    padding: 14px 38px;
+    border: 1px solid var(--ink);
+    border-radius: 100px;
+    color: var(--ink); text-decoration: none;
+    font-size: 14px; letter-spacing: 0.14em; text-transform: uppercase;
+    transition: background 0.3s ease, color 0.3s ease;
+  }
+  .cta:hover { background: var(--ink); color: var(--bg); }
+
+  /* -- sticky nav -- */
+  #brandnav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 80;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 4vw;
+    background: rgba(243, 241, 238, 0.86);
+    backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--hairline);
+    opacity: 0; pointer-events: none; transform: translateY(-8px);
+    transition: opacity 0.4s ease, transform 0.4s ease;
+  }
+  #brandnav.on { opacity: 1; pointer-events: auto; transform: none; }
+  #brandnav .mark { letter-spacing: 0.4em; text-indent: 0.4em; font-size: 13px; color: var(--ink); text-transform: uppercase; }
+  #brandnav .links { display: flex; gap: 2.4vw; }
+  #brandnav a { color: var(--text-dim); text-decoration: none; font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; transition: color 0.25s; }
+  #brandnav a:hover { color: var(--ink); }
+  #brandnav .navcta { border: 1px solid var(--ink); border-radius: 100px; padding: 8px 22px; color: var(--ink); }
+  @media (max-width: 760px) { #brandnav .links { display: none; } }
+
+  /* -- brand page sections -- */
+  .bp { position: relative; padding: 14vh 7vw; max-width: 1500px; margin: 0 auto; }
+  .bp .kicker { font-size: 11px; letter-spacing: 0.35em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 18px; }
+  .bp h2 { font-weight: 650; letter-spacing: -0.035em; line-height: 1.0; font-size: clamp(34px, 4.6vw, 68px); }
+  .bp p.lead { color: var(--text-dim); font-size: clamp(14px, 1.3vw, 18px); line-height: 1.75; max-width: 44ch; margin-top: 22px; }
+  [data-reveal] { opacity: 0; transform: translateY(26px); transition: opacity 0.9s cubic-bezier(.2,.6,.2,1), transform 0.9s cubic-bezier(.2,.6,.2,1); }
+  [data-reveal].in { opacity: 1; transform: none; }
+
+  .shot {
+    width: 100%; border-radius: 6px; display: block; aspect-ratio: 16 / 10; object-fit: cover;
+    -webkit-mask-image: radial-gradient(ellipse 88% 88% at 50% 50%, black 60%, transparent 100%);
+    mask-image: radial-gradient(ellipse 88% 88% at 50% 50%, black 60%, transparent 100%);
+  }
+  .shot.missing { background: linear-gradient(160deg, #e8e5e1, #f3f1ee); border: 1px solid var(--hairline); }
+
+  .bp-split { display: grid; grid-template-columns: 1fr 1fr; gap: 6vw; align-items: center; }
+  .bp-split.flip > :first-child { order: 2; }
+  @media (max-width: 800px) { .bp-split { grid-template-columns: 1fr; gap: 6vh; } .bp-split.flip > :first-child { order: 0; } }
+
+  .bp-manifesto { text-align: center; padding: 22vh 7vw; }
+  .bp-manifesto h2 { font-size: clamp(40px, 7vw, 108px); max-width: 15ch; margin: 0 auto; }
+
+  .bp-stats { display: flex; flex-wrap: wrap; justify-content: center; gap: 7vw; text-align: center; }
+  .bp-stats .num { font-weight: 650; letter-spacing: -0.04em; font-size: clamp(38px, 5vw, 76px); color: var(--ink); }
+  .bp-stats .lbl { margin-top: 6px; font-size: 11px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--text-dim); }
+
+  .bp-specs table { width: 100%; max-width: 760px; margin: 34px auto 0; border-collapse: collapse; }
+  .bp-specs td { padding: 16px 8px; border-bottom: 1px solid var(--hairline); font-size: clamp(13px, 1.2vw, 16px); line-height: 1.5; }
+  .bp-specs td:first-child { color: var(--text-dim); letter-spacing: 0.12em; text-transform: uppercase; font-size: 12px; }
+  .bp-specs td:last-child { text-align: right; }
+
+  .bp-quote { text-align: center; max-width: 36ch; margin: 0 auto; }
+  .bp-quote blockquote { font-size: clamp(22px, 2.8vw, 40px); font-weight: 550; letter-spacing: -0.025em; line-height: 1.34; }
+  .bp-quote cite { display: block; margin-top: 22px; font-style: normal; font-size: 12px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--text-dim); }
+
+  .bp-gallery { display: grid; grid-template-columns: repeat(12, 1fr); gap: 18px; }
+  .bp-gallery .shot { height: 100%; }
+  .bp-gallery .g1 { grid-column: span 7; aspect-ratio: 4/3; }
+  .bp-gallery .g2 { grid-column: span 5; aspect-ratio: 4/5; }
+  .bp-gallery .g3 { grid-column: span 5; aspect-ratio: 1/1; }
+  .bp-gallery .g4 { grid-column: span 7; aspect-ratio: 16/10; }
+  @media (max-width: 800px) { .bp-gallery .shot { grid-column: span 12 !important; } }
+
+  .bp-ctaband { text-align: center; padding: 20vh 7vw; }
+  .bp-ctaband h2 { max-width: 16ch; margin: 0 auto 10px; }
+
+  footer.bp-footer { border-top: 1px solid var(--hairline); padding: 9vh 7vw 6vh; }
+  .bp-footer .cols { display: grid; grid-template-columns: 2fr repeat(3, 1fr); gap: 5vw; max-width: 1500px; margin: 0 auto; }
+  .bp-footer h3 { font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 16px; font-weight: 500; }
+  .bp-footer a { display: block; color: var(--text-dim); text-decoration: none; font-size: 14px; margin-bottom: 10px; }
+  .bp-footer a:hover { color: var(--ink); }
+  .bp-footer .fine { margin-top: 8vh; text-align: center; font-size: 12px; letter-spacing: 0.04em; line-height: 1.6; color: rgba(23, 24, 27, 0.42); }
+  @media (max-width: 800px) { .bp-footer .cols { grid-template-columns: 1fr 1fr; } }
+</style>
+</head>
+<body>
+
+<div id="loader">
+  <div class="mark">Vantis</div>
+  <div class="bar"><i id="loadbar"></i></div>
+</div>
+
+<nav id="brandnav">
+  <span class="mark">Vantis</span>
+  <div class="links">
+    <a href="#story">Story</a><a href="#craft">Craft</a><a href="#specs">Specs</a><a href="#gallery">Gallery</a>
+  </div>
+  <a class="navcta" href="#reserve">Reserve</a>
+</nav>
+
+<!-- ============ THE FILM ============ -->
+<div id="track">
+  <div id="stage">
+    <canvas id="film"></canvas>
+    <div id="scrim"></div>
+    <div id="vignette"></div>
+
+    <!-- title -->
+    <div class="caption cap-center" data-in="-0.05" data-hold="0.020" data-out="0.085">
+      <h1>VANTIS 01</h1>
+      <p>Run lighter.</p>
+    </div>
+
+    <!-- the pair, floating : ~0.14-0.26 -->
+    <div class="caption cap-left" data-in="0.115" data-hold="0.155" data-out="0.205">
+      <span class="num">01 / Colourway</span>
+      <h2>Bone white,<br>head to toe.</h2>
+      <p>One colourway. No logos, no noise, nothing to distract from the shape.</p>
+    </div>
+
+    <!-- macro, the upper : ~0.26-0.40 -->
+    <div class="caption cap-right" data-in="0.225" data-hold="0.265" data-out="0.305">
+      <span class="num">02 / Upper</span>
+      <h2>One thread.<br>No seams.</h2>
+      <p>A single filament, knitted into a whole upper. Nothing to stitch, nothing to peel away.</p>
+    </div>
+
+    <!-- outsole : ~0.40-0.52 -->
+    <div class="caption cap-left" data-in="0.330" data-hold="0.380" data-out="0.435">
+      <span class="num">03 / Contact</span>
+      <h2>Every contact,<br>mapped.</h2>
+      <p>Zoned rubber, 1.2 mm, placed only where the road actually touches.</p>
+    </div>
+
+    <!-- hanging by the laces : ~0.52-0.66 -->
+    <div class="caption cap-right" data-in="0.460" data-hold="0.505" data-out="0.555">
+      <span class="num">04 / Weight</span>
+      <h2>One hundred<br>and ninety grams.</h2>
+      <p>Every one of them earning its place on your foot.</p>
+    </div>
+
+    <!-- air unit / macro : ~0.66-0.82 -->
+    <div class="caption cap-left" data-in="0.700" data-hold="0.750" data-out="0.805">
+      <span class="num">05 / Return</span>
+      <h2>It gives<br>it back.</h2>
+      <p>Supercritical foam returns eighty-four percent of the energy you put into it.</p>
+    </div>
+
+    <!-- final wide : ~0.88-1.00 -->
+    <div class="caption cap-bottom" data-in="0.855" data-hold="0.930" data-out="1.10">
+      <h1>VANTIS 01</h1>
+      <p>Shipping spring 2027.</p>
+      <a class="cta" href="#reserve">Reserve yours</a>
+    </div>
+
+    <div id="scroll-cue">Scroll</div>
+  </div>
+</div>
+
+<!-- ============ THE BRAND PAGE ============ -->
+
+<section class="bp bp-manifesto" id="story">
+  <div data-reveal>
+    <p class="kicker">Vantis</p>
+    <h2>The best equipment disappears.</h2>
+  </div>
+</section>
+
+<section class="bp">
+  <div class="bp-split">
+    <div data-reveal>
+      <p class="kicker">Origin</p>
+      <h2>Built after a bad race.</h2>
+      <p class="lead">Our founder finished a marathon in shoes that had done everything right except get out of the way. Four years and eleven lasts later, the 01 is what is left when you remove everything a runner never asked for.</p>
+    </div>
+    <img class="shot" data-reveal data-shot src="img/origin.webp" alt="VANTIS 01, the pair, suspended in a white studio" />
+  </div>
+</section>
+
+<section class="bp" id="craft">
+  <div class="bp-split flip">
+    <div data-reveal>
+      <p class="kicker">Craft &mdash; 01</p>
+      <h2>Knitted, not cut.</h2>
+      <p class="lead">The upper leaves the machine as one closed piece, zoned tight through the midfoot and open across the toes. No overlays, no glue, and eleven percent of the waste of a cut-and-sew shoe.</p>
+    </div>
+    <img class="shot" data-reveal data-shot src="img/knit-macro.webp" alt="Macro detail of the knitted upper" />
+  </div>
+</section>
+
+<section class="bp">
+  <div class="bp-split">
+    <div data-reveal>
+      <p class="kicker">Craft &mdash; 02</p>
+      <h2>Only where it touches.</h2>
+      <p class="lead">The outsole carries rubber in four zones and nothing anywhere else. Less material under the arch means less weight to lift, two hundred times a minute.</p>
+    </div>
+    <img class="shot" data-reveal data-shot src="img/sole-macro.webp" alt="The zoned rubber outsole" />
+  </div>
+</section>
+
+<section class="bp">
+  <div class="bp-stats">
+    <div data-reveal><div class="num">190g</div><div class="lbl">US M9</div></div>
+    <div data-reveal><div class="num">84%</div><div class="lbl">Energy return</div></div>
+    <div data-reveal><div class="num">4mm</div><div class="lbl">Heel drop</div></div>
+    <div data-reveal><div class="num">9</div><div class="lbl">Components</div></div>
+  </div>
+</section>
+
+<section class="bp bp-specs" id="specs">
+  <div data-reveal>
+    <p class="kicker" style="text-align:center">Specifications</p>
+    <table>
+      <tr><td>Weight</td><td>190 g / 6.7 oz (US M9)</td></tr>
+      <tr><td>Stack height</td><td>38 mm heel / 34 mm forefoot</td></tr>
+      <tr><td>Drop</td><td>4 mm</td></tr>
+      <tr><td>Midsole</td><td>Supercritical PEBA, dual density</td></tr>
+      <tr><td>Plate</td><td>Full-length unidirectional carbon</td></tr>
+      <tr><td>Upper</td><td>Single-filament engineered knit</td></tr>
+      <tr><td>Outsole</td><td>Zoned rubber, 1.2 mm</td></tr>
+      <tr><td>Colourway</td><td>Bone white</td></tr>
+      <tr><td>Intended use</td><td>Road racing, 5K to marathon</td></tr>
+      <tr><td>Sizes</td><td>US M4&ndash;14, W5&ndash;12</td></tr>
+    </table>
+  </div>
+</section>
+
+<section class="bp bp-quote">
+  <div data-reveal>
+    <blockquote>&ldquo;Twenty kilometres in, I stopped noticing them. That is the entire review.&rdquo;</blockquote>
+    <cite>Early tester, Lisbon</cite>
+  </div>
+</section>
+
+<section class="bp" id="gallery">
+  <div class="bp-gallery">
+    <img class="shot g1" data-reveal data-shot src="img/gallery-1.webp" alt="VANTIS 01 suspended by the laces" />
+    <img class="shot g2" data-reveal data-shot src="img/gallery-2.webp" alt="VANTIS 01 three-quarter view" />
+    <img class="shot g3" data-reveal data-shot src="img/gallery-3.webp" alt="VANTIS 01 outsole" />
+    <img class="shot g4" data-reveal data-shot src="img/gallery-4.webp" alt="VANTIS 01, the pair" />
+  </div>
+</section>
+
+<section class="bp bp-ctaband" id="reserve">
+  <div data-reveal>
+    <h2>Put on less shoe.</h2>
+    <p class="lead" style="margin: 22px auto 0; text-align:center">First run of 2,000 pairs. Spring 2027.</p>
+    <a class="cta" href="#reserve">Reserve yours</a>
+  </div>
+</section>
+
+<footer class="bp-footer">
+  <div class="cols">
+    <div>
+      <span style="letter-spacing:0.4em;text-transform:uppercase;color:var(--ink);font-size:13px">Vantis</span>
+      <p class="lead" style="margin-top:14px;font-size:13px">Racing footwear, reduced to what runs.</p>
+    </div>
+    <div><h3>Product</h3><a href="#story">Story</a><a href="#craft">Craft</a><a href="#specs">Specs</a><a href="#gallery">Gallery</a></div>
+    <div><h3>Company</h3><a href="#reserve">About</a><a href="#reserve">Journal</a><a href="#reserve">Stockists</a></div>
+    <div><h3>Support</h3><a href="#reserve">Care</a><a href="#reserve">Warranty</a><a href="#reserve">Contact</a></div>
+  </div>
+  <p class="fine">&copy; 2027 Vantis. A concept build. All imagery AI-generated.</p>
+</footer>
+
+<script src="main.js"></script>
+<script>
+  const io = new IntersectionObserver(
+    (es) => es.forEach((e) => e.isIntersecting && e.target.classList.add("in")),
+    { threshold: 0.18 }
+  );
+  document.querySelectorAll("[data-reveal]").forEach((el) => io.observe(el));
+  const revealNow = () =>
+    document.querySelectorAll("[data-reveal]:not(.in)").forEach((el) => {
+      const r = el.getBoundingClientRect();
+      if (r.top < innerHeight * 0.92 && r.bottom > 0) el.classList.add("in");
+    });
+  addEventListener("scroll", revealNow, { passive: true });
+  revealNow();
+
+  const nav = document.getElementById("brandnav");
+  const filmEnd = () => (document.getElementById("track")?.offsetHeight ?? innerHeight * 3) - innerHeight;
+  addEventListener("scroll", () => nav.classList.toggle("on", scrollY > filmEnd() * 0.95), { passive: true });
+
+  const BLANK = "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";
+  document.querySelectorAll("[data-shot]").forEach((img) => {
+    img.addEventListener("error", () => {
+      if (img.src === BLANK) return;
+      img.classList.add("missing");
+      img.src = BLANK;
+    });
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "clips_dir": "assets/clips",
+  "frames_dir": "frames",
+  "master": "assets/master.mp4",
+  "fps": 24,
+  "width": 1280,
+  "quality": 80,
+  "xfade": 0.5,
+  "chapters": [
+    { "name": "float", "file": "float.mp4" }
+  ]
+}

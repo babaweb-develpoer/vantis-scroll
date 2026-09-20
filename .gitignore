@@ -1,0 +1,13 @@
+# Derived build output - regenerate with tools/build_master.py
+assets/master.mp4
+assets/clips-previz/
+
+# Working files, not part of the site
+assets/canva/
+assets/incoming/
+assets/*WATERMARKED*
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+desktop.ini
